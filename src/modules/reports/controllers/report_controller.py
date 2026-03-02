@@ -91,7 +91,7 @@ async def list_reports(
     limit: int = 100
 ):
     """
-    List all reports for the current user
+    List all reports for the current user (excludes soft-deleted)
     
     Supports pagination.
     """
@@ -100,7 +100,40 @@ async def list_reports(
     user_id = UUID(current_user["id"])
     reports = db.query(TrustReport).filter(
         TrustReport.user_id == user_id,
+        TrustReport.is_deleted == "false",
         TrustReport.deleted_at.is_(None)
     ).order_by(TrustReport.created_at.desc()).offset(skip).limit(limit).all()
     
     return reports
+
+
+@router.delete("/{report_id}")
+async def delete_report(
+    report_id: UUID,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Soft delete a report (user-controlled deletion)
+    
+    - Only the report owner can delete
+    - Returns 404 if not found or not owned (prevents leaking existence)
+    - Idempotent (returns success if already deleted)
+    - Audit log is retained
+    
+    Requires JWT authentication.
+    """
+    user_id = UUID(current_user["id"])
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+    
+    service = ReportService(db)
+    result = service.soft_delete_report(
+        report_id=report_id,
+        user_id=user_id,
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
+    
+    return result

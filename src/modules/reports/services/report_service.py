@@ -4,6 +4,7 @@ from src.modules.reports.schemas import GenerateReportRequest
 from src.modules.reports.services.pdf_service import PDFService
 from src.modules.reports.services.storage_service import S3StorageService
 from src.modules.reports.services.audit_service import AuditService
+from datetime import datetime
 from typing import Optional
 from uuid import UUID
 from fastapi import HTTPException
@@ -141,10 +142,11 @@ class ReportService:
             )
     
     def get_report(self, report_id: UUID, user_id: UUID) -> Optional[TrustReport]:
-        """Get report by ID with owner validation"""
+        """Get report by ID with owner validation (excludes soft-deleted)"""
         report = self.db.query(TrustReport).filter(
             TrustReport.id == report_id,
             TrustReport.user_id == user_id,
+            TrustReport.is_deleted == "false",
             TrustReport.deleted_at.is_(None)
         ).first()
         
@@ -162,3 +164,87 @@ class ReportService:
         
         signed_url = self.storage_service.generate_signed_url(report.storage_path)
         return signed_url
+    
+    def soft_delete_report(
+        self,
+        report_id: UUID,
+        user_id: UUID,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None
+    ) -> dict:
+        """
+        Soft delete a report (user-controlled deletion)
+        
+        - Verifies ownership
+        - Sets deleted_at and is_deleted=true
+        - Logs audit trail
+        - Idempotent (returns success if already deleted)
+        
+        Args:
+            report_id: Report UUID to delete
+            user_id: Authenticated user UUID
+            ip_address: Client IP for audit
+            user_agent: Client user agent for audit
+            
+        Returns:
+            dict with success status and message
+            
+        Raises:
+            HTTPException 404 if report not found or not owned by user
+        """
+        try:
+            # Fetch report with ownership check
+            report = self.db.query(TrustReport).filter(
+                TrustReport.id == report_id,
+                TrustReport.user_id == user_id
+            ).first()
+            
+            # Return 404 if not found or not owned (don't leak existence)
+            if not report:
+                raise HTTPException(status_code=404, detail="Report not found")
+            
+            # Idempotent: if already deleted, return success
+            if report.is_deleted == "true" or report.deleted_at is not None:
+                return {
+                    "success": True,
+                    "message": "Report deleted",
+                    "report_id": str(report_id)
+                }
+            
+            # Perform soft delete
+            report.is_deleted = "true"
+            report.deleted_at = datetime.utcnow()
+            
+            # Log audit trail
+            self.audit_service.log_action(
+                db=self.db,
+                user_id=user_id,
+                action_type="delete_report",
+                entity_type="TrustReport",
+                entity_id=report_id,
+                metadata={
+                    "report_type": report.report_type,
+                    "title": report.title,
+                    "deleted_at": report.deleted_at.isoformat()
+                },
+                ip_address=ip_address,
+                user_agent=user_agent
+            )
+            
+            # Commit transaction
+            self.db.commit()
+            
+            return {
+                "success": True,
+                "message": "Report deleted",
+                "report_id": str(report_id)
+            }
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to delete report: {str(e)}"
+            )

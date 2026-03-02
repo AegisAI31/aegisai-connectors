@@ -46,6 +46,7 @@ class TrustReport(Base):
     storage_path = Column(Text)
     checksum_hash = Column(Text)
     version = Column(Integer, default=1)
+    is_deleted = Column(String(10), default="false", nullable=False)
     deleted_at = Column(TIMESTAMP, index=True)
     created_at = Column(TIMESTAMP, default=datetime.utcnow, index=True)
     updated_at = Column(TIMESTAMP, default=datetime.utcnow, onupdate=datetime.utcnow)
