@@ -1,11 +1,10 @@
-from sqlalchemy import Column, String, Text, Integer, ForeignKey, TIMESTAMP, Enum, CheckConstraint
+from sqlalchemy import Column, String, Text, Integer, TIMESTAMP, Enum, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
 import enum
 
-from app.db.base import Base
+from src.db.base import Base
 
 
 class ReportStatus(str, enum.Enum):
@@ -19,27 +18,28 @@ class ReportType(str, enum.Enum):
     RISK = "risk"
     BIAS = "bias"
     MODEL_EVAL = "model_eval"
+    TRUST_EVALUATION = "trust_evaluation"
 
 
 class ActionType(str, enum.Enum):
-    CREATE_REPORT = "CREATE_REPORT"
-    DELETE_REPORT = "DELETE_REPORT"
-    LOGIN = "LOGIN"
-    LOGOUT = "LOGOUT"
-    CREATE_API_KEY = "CREATE_API_KEY"
-    REVOKE_API_KEY = "REVOKE_API_KEY"
-    TRUST_EVALUATION = "TRUST_EVALUATION"
+    CREATE_REPORT = "create_report"
+    DELETE_REPORT = "delete_report"
+    LOGIN = "login"
+    LOGOUT = "logout"
+    CREATE_API_KEY = "create_api_key"
+    REVOKE_API_KEY = "revoke_api_key"
+    TRUST_EVALUATION = "trust_evaluation"
 
 
 class TrustReport(Base):
     __tablename__ = "trust_reports"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     title = Column(String(255))
     description = Column(Text)
-    report_type = Column(Enum(ReportType, name="report_type"), nullable=False, index=True)
-    status = Column(Enum(ReportStatus, name="report_status"), default=ReportStatus.GENERATING, index=True)
+    report_type = Column(String(50), nullable=False, index=True)
+    status = Column(String(20), default="generating", index=True)
     input_payload = Column(JSONB)
     output_summary = Column(Text)
     output_full_report = Column(JSONB)
@@ -50,25 +50,19 @@ class TrustReport(Base):
     created_at = Column(TIMESTAMP, default=datetime.utcnow, index=True)
     updated_at = Column(TIMESTAMP, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Relationships
-    user = relationship("User", back_populates="trust_reports")
-
 
 class AuditTrail(Base):
     __tablename__ = "audit_trails"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), index=True)
-    action_type = Column(Enum(ActionType, name="action_type"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), index=True)
+    action_type = Column(String(50), nullable=False, index=True)
     entity_type = Column(String(100), index=True)
     entity_id = Column(UUID(as_uuid=True), index=True)
-    metadata = Column(JSONB)
+    action_metadata = Column(JSONB)
     ip_address = Column(String(45))
     user_agent = Column(Text)
     created_at = Column(TIMESTAMP, default=datetime.utcnow, index=True)
-
-    # Relationships
-    user = relationship("User", back_populates="audit_trails")
 
 
 class DeletionLog(Base):
@@ -76,11 +70,8 @@ class DeletionLog(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     report_id = Column(UUID(as_uuid=True), index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), index=True)
+    user_id = Column(UUID(as_uuid=True), index=True)
     deletion_type = Column(String(20), CheckConstraint("deletion_type IN ('soft', 'hard')"))
     reason = Column(Text)
-    metadata = Column(JSONB)
+    deletion_metadata = Column(JSONB)
     created_at = Column(TIMESTAMP, default=datetime.utcnow, index=True)
-
-    # Relationships
-    user = relationship("User", back_populates="deletion_logs")
