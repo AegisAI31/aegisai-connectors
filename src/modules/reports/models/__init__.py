@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, Integer, TIMESTAMP, Enum, CheckConstraint
+from sqlalchemy import Column, String, Text, Integer, TIMESTAMP, Enum, CheckConstraint, Boolean
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from datetime import datetime
 import uuid
@@ -36,6 +36,8 @@ class TrustReport(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    report_name = Column(String(100), index=True)        # e.g. "Cobalt Nexus"
+    vx_report_id = Column(String(30), index=True)        # e.g. "VX-20260310-A1B2"
     title = Column(String(255))
     description = Column(Text)
     report_type = Column(String(50), nullable=False, index=True)
@@ -46,7 +48,7 @@ class TrustReport(Base):
     storage_path = Column(Text)
     checksum_hash = Column(Text)
     version = Column(Integer, default=1)
-    is_deleted = Column(String(10), default="false", nullable=False)
+    is_deleted = Column(Boolean, default=False, nullable=False)
     deleted_at = Column(TIMESTAMP, index=True)
     created_at = Column(TIMESTAMP, default=datetime.utcnow, index=True)
     updated_at = Column(TIMESTAMP, default=datetime.utcnow, onupdate=datetime.utcnow)

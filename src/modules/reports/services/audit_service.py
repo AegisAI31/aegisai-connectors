@@ -37,7 +37,7 @@ class AuditService:
             action_type=action_type,
             entity_type=entity_type,
             entity_id=entity_id,
-            metadata=metadata,
+            action_metadata=metadata,
             ip_address=ip_address,
             user_agent=user_agent
         )
