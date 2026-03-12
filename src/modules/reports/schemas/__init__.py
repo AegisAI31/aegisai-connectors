@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
+from uuid import UUID
 from datetime import datetime
 from src.modules.reports.models import ReportType, ReportStatus
 
@@ -15,8 +16,10 @@ class GenerateReportRequest(BaseModel):
 
 
 class ReportResponse(BaseModel):
-    id: str
-    user_id: str
+    id: UUID
+    user_id: UUID
+    report_name: Optional[str] = None
+    vx_report_id: Optional[str] = None
     title: Optional[str]
     description: Optional[str]
     report_type: ReportType
